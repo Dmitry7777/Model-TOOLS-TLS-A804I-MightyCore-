@@ -1,0 +1,183 @@
+/*
+ * Essentially, it is necessary to scribe and create the firmware for this hardware!
+ * You can select some of these commands, program codes, and functions and place them on the space of the sketch.
+ */
+
+#include<avr/io.h> //Primarily, it is necessary to install the drivers for the microcontroller unit on the IDE Arduino: https://github.com/MCUdude/MightyCore
+#include<SPI.h> //
+//#include<I2C.h> //
+#include<LiquidCrystal.h> //
+#include<DS1307.h> //
+#include<EEPROM.h> //
+//#include"DS1621.h" //By the reference, it is necessary to place in the project a driver for the digital temperature sensor: https://github.com/Dmitry7777/DS1621-temperature-probe-library-for-Arduino
+#include"Buzzer.h" //By the reference, it is necessary to place in the project a driver for the buzzer: https://github.com/Dmitry7777/Buzzer/blob/master/Buzzer.h
+
+/*Microcontrollers Atmega8535/16/32/164/324/644/1284 pinout configuration, Standard pins */ 
+/*Interface of Port B*/
+#define MCU_SPI_PBDI_PORTB_PB0_LED        0x00; //
+#define MCU_SPI_PBDI_PORTB_PB1            0x01; //
+#define MCU_SPI_PBDI_PORTB_PB2            0x02; //
+#define MCU_SPI_PBDI_PORTB_PB3            0x03; //
+#define MCU_SPI_PBDI_PORTB_PB4_SS         0x04; //
+#define MCU_SPI_PBDI_PORTB_PB5_MOSI       0x05; //
+#define MCU_SPI_PBDI_PORTB_PB6_MISO       0x06; //
+#define MCU_SPI_PBDI_PORTB_PB7_SCK        0x07; // 
+
+/*Interface of Port D*/
+#define MCU_USART_PDDI_PORTD_PD0_RXD      0x08; //
+#define MCU_USART_PDDI_PORTD_PD1_TXD      0x09; //
+#define MCU_USART_PDDI_PORTD_PD2          0x0A; //
+#define MCU_USART_PDDI_PORTD_PD3          0x0B; //
+#define MCU_USART_PDDI_PORTD_PD4          0x0C; //
+#define MCU_USART_PDDI_PORTD_PD5          0x0D; // 
+#define MCU_USART_PDDI_PORTD_PD6          0x0E; //
+#define MCU_USART_PDDI_PORTD_PD7          0x0F; // 
+
+/*Interface of Port C*/ 
+#define MCU_TWI_PCDI_PORTC_PC0_SCL        0x10; //
+#define MCU_TWI_PCDI_PORTC_PC1_SDA        0x11; //
+#define MCU_TWI_PCDI_PORTC_PC2_TCK        0x12; //
+#define MCU_TWI_PCDI_PORTC_PC3_TMS        0x13; //
+#define MCU_TWI_PCDI_PORTC_PC4_TDO        0x14; //
+#define MCU_TWI_PCDI_PORTC_PC5_TDI        0x15; //
+#define MCU_TWI_PCDI_PORTC_PC6            0x16; //
+#define MCU_TWI_PCDI_PORTC_PC7            0x17; //
+
+/*Interface of Port A*/
+#define MCU_PADI_PORTA_ADC_PA0            0x18; //
+#define MCU_PADI_PORTA_ADC_PA1            0x19; //
+#define MCU_PADI_PORTA_ADC_PA2            0x1A; //
+#define MCU_PADI_PORTA_ADC_PA3            0x1B; //
+#define MCU_PADI_PORTA_ADC_PA4            0x1C; //
+#define MCU_PADI_PORTA_ADC_PA5            0x1D; //
+#define MCU_PADI_PORTA_ADC_PA6            0x1E; //
+#define MCU_PADI_PORTA_ADC_PA7            0x1F; //
+
+/*Pin modes of the liquid crystal display*/
+const int LCD_RS = MCU_SPI_PBDI_PORTB_PB2; //
+const int LCD_RW = MCU_SPI_PBDI_PORTB_PB3; //
+const int LCD_E = MCU_SPI_PBDI_PORTB_PB4_SS; //
+const int LCD_DB0 = MCU_USART_PDDI_PORTD_PD0_RXD; //
+const int LCD_DB1 = MCU_USART_PDDI_PORTD_PD1_TXD; //
+const int LCD_DB2 = MCU_USART_PDDI_PORTD_PD2; //
+const int LCD_DB3 = MCU_USART_PDDI_PORTD_PD3; //
+const int LCD_DB4 = MCU_USART_PDDI_PORTD_PD4; //
+const int LCD_DB5 = MCU_USART_PDDI_PORTD_PD5; //
+const int LCD_DB6 = MCU_USART_PDDI_PORTD_PD6; //
+const int LCD_DB7 = MCU_USART_PDDI_PORTD_PD7; //
+LiquidCrystal LCD_1604(LCD_RS, LCD_RW, LCD_E, LCD_DB0, LCD_DB1, LCD_DB2, LCD_DB3, LCD_DB4, LCD_DB5, LCD_DB6, LCD_DB7); //These are configuration commands which operate with the bus of the liquid crystal display.
+
+/*Pin modes of the real-time clock*/
+extern uint8_t RTC_I2C_SDA = MCU_TWI_PCDI_PORTC_PC1_SDA; //
+extern uint8_t RTC_I2C_SCL = MCU_TWI_PCDI_PORTC_PC0_SCL; //
+DS1307 RTC_I2C(RTC_I2C_SDA, RTC_I2C_SCL); //These are configuration commands which operate with the bus of the real-time clock.
+
+/*Pin modes of the electrically erasable programmable read-only memory*/
+extern uint8_t EEPROM_I2C_SDA = MCU_TWI_PCDI_PORTC_PC1_SDA; //
+extern uint8_t EEPROM_I2C_SCL = MCU_TWI_PCDI_PORTC_PC0_SCL; //
+
+/*Pin modes of the digital temperature sensor*/
+extern uint8_t DTMR_I2C_SCL = MCU_TWI_PCDI_PORTC_PC0_SCL; //
+extern uint8_t DTMR_I2C_SDA = MCU_TWI_PCDI_PORTC_PC1_SDA; //
+//DS1621 DTMR_I2C = DS1621(addr); //
+
+/*Pin modes of the alert buzzer*/
+const int BUZZ_IN = MCU_TWI_PCDI_PORTC_PC2_TCK; //
+Buzzer BUZZ(BUZZ_IN); //These are configuration commands which operate with the alert buzzer.
+
+/*Pin modes of the light-emitting diodes*/
+const int LED_RED_IN = MCU_TWI_PCDI_PORTC_PC3_TMS; //
+const int LED_YELLOW_IN = MCU_TWI_PCDI_PORTC_PC4_TDO; //
+
+/*Pin modes of the analog barometric pressure sensor*/
+const int ABPS_OUTM = MCU_PADI_PORTA_ADC_PA1; //
+const int ABPS_OUTP = MCU_PADI_PORTA_ADC_PA0; //
+
+/*Pin modes of the general-purpose bus*/
+const int J1_CONN_PIN5 = MCU_PADI_PORTA_ADC_PA0; //
+const int J1_CONN_PIN7 = MCU_PADI_PORTA_ADC_PA1; //
+const int J1_CONN_PIN9 = MCU_PADI_PORTA_ADC_PA2; //
+const int J1_CONN_PIN11 = MCU_PADI_PORTA_ADC_PA3; //
+const int J1_CONN_PIN13 = MCU_PADI_PORTA_ADC_PA4; //
+const int J1_CONN_PIN15 = MCU_PADI_PORTA_ADC_PA5; //
+const int J1_CONN_PIN17 = MCU_PADI_PORTA_ADC_PA6; //
+const int J1_CONN_PIN19 = MCU_PADI_PORTA_ADC_PA7; //
+const int J1_CONN_PIN21 = MCU_SPI_PBDI_PORTB_PB0_LED; //
+const int J1_CONN_PIN23 = MCU_SPI_PBDI_PORTB_PB1; //
+const int J1_CONN_PIN10 = MCU_TWI_PCDI_PORTC_PC7; //
+const int J1_CONN_PIN12 = MCU_TWI_PCDI_PORTC_PC6; //
+const int J1_CONN_PIN14 = MCU_TWI_PCDI_PORTC_PC5_TDI; //
+const int J1_CONN_PIN16 = MCU_TWI_PCDI_PORTC_PC4_TDO; //
+const int J1_CONN_PIN18 = MCU_TWI_PCDI_PORTC_PC3_TMS; //
+const int J1_CONN_PIN20 = MCU_TWI_PCDI_PORTC_PC2_TCK; //
+const int J1_CONN_PIN22 = MCU_TWI_PCDI_PORTC_PC1_SDA; //
+const int J1_CONN_PIN24 = MCU_TWI_PCDI_PORTC_PC0_SCL; //
+
+//byte J1_Connector[] = (J1_CONN_PIN5, J1_CONN_PIN7);
+
+/*These are configuration commands of the resolution of the liquid crystal display.*/
+unsigned int LCD_COLUMN = 16; //
+unsigned int LCD_ROW = 4; //
+
+/*You can select to display the value indication.*/
+const char Power[] = "W"; //It displays the symbol of the power
+const char Energy[] = "kW/h"; //It displays the symbol of the energy
+const char Voltage[] = "V"; //It displays the symbol of the voltage
+const char Current[] = "A"; //It displays the symbol of the electric current
+const char Resistance[] = "Ohm"; //It displays the symbol of the resistance
+const char Capacity[] = "uF"; //It displays the symbol of the capacity
+const char Inductance[] = "mH"; //It displays the symbol of the inductance
+const char Frequency[] = "Hz"; //It displays the symbol of the frequency
+const char Mass[] = "kg"; //It displays the symbol of the mass
+const char Volume[] = "m3"; //It displays the symbol of the volume of the liquid
+const char Velocity[] = "km/h"; //It displays the symbol of the velocity
+const char Temperature[] = "C"; //It displays the symbol of the temperature
+const char Pressure[] = "Pa"; //It displays the symbol of the pressure
+const char Magnetic[] = "uT"; //It displays the symbol of the electromagnetic field (exertion)
+const char Electric[] = "V/m"; //It displays the symbol of the electric field (exertion)
+const char Xray[] = "eV"; //It displays the symbol of the x-ray
+const char Isotope[] = "uSv/h"; //It displays the symbol of the isotope radiation
+const char Time[] = "Time:"; //It displays the symbol of the time
+const char Data[] = "Data:"; //It displays the symbol of the data
+
+/*These are configuration commands of the digital value displaying of the liquid crystal display.*/
+float LCD_X0Y0; //It displays the value on the first string of the liquid crystal display.
+float LCD_X1Y0; //It displays the value on the second string of the liquid crystal display.
+float LCD_X2Y0; //It displays the value on the third string of the liquid crystal display.
+float LCD_X3Y0; //It displays the value on the fourth string of the liquid crystal display.
+float P; //
+float J; //
+float U; //
+float I; //
+float R; //
+float C; //
+float L; //
+float f; //
+float m; //
+float V; //
+float v; //
+float T; //
+float O; //
+float E; //
+
+void setup() {
+  // put your setup code here, to run once:
+LCD_1604.begin(LCD_COLUMN, LCD_ROW); //It commences an initialization for the liquid crystal display
+digitalWrite(BUZZ_IN, OUTPUT); //It transmits the digital signals to the alert buzzer.
+digitalWrite(LED_RED_IN, OUTPUT); //It transmits the digital signals to the red light-emitting diode.
+digitalWrite(LED_YELLOW_IN, OUTPUT); //It transmits the digital signals to the yellow light-emitting diode.
+//int ABPS = analogRead(ABPS_OUT, INPUT); //
+
+}
+
+void loop() {
+  // put your main code here, to run repeatedly:
+LCD_1604.setCursor(0, 0); //
+LCD_1604.print(LCD_X0Y0); //
+LCD_1604.setCursor(0, 1); //
+LCD_1604.print(LCD_X1Y0); //
+LCD_1604.setCursor(0, 2); //
+LCD_1604.print(LCD_X2Y0); //
+LCD_1604.setCursor(0, 3); //
+LCD_1604.print(LCD_X3Y0); //
+}
